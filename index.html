@@ -611,35 +611,21 @@ table.spec-table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
   <!-- Data -->
   <script>
 window.SPECIALTIES = [
+  { id: "general",   name: "通論",   short: "通", className: "spec-internal" },
   { id: "internal",  name: "內科",   short: "內", className: "spec-internal" },
   { id: "psych",     name: "精神科", short: "精", className: "spec-psych" },
   { id: "pediatric", name: "兒科",   short: "兒", className: "spec-pediatric" },
   { id: "surgery",   name: "外科",   short: "外", className: "spec-surgery" },
   { id: "obgyn",     name: "婦產科", short: "婦", className: "spec-obgyn" },
   { id: "anesth",    name: "麻醉科", short: "麻", className: "spec-anesth" },
+  { id: "family",    name: "家庭科", short: "家", className: "spec-pediatric" },
 ];
 window.QUESTION_TYPES = [
-  { id: "concept", name: "概念題", desc: "基礎醫學知識" },
-  { id: "case",    name: "案例題", desc: "臨床情境判斷" },
-  { id: "calc",    name: "計算題", desc: "藥物劑量、生理計算" },
-  { id: "law",     name: "法規題", desc: "醫療相關法規" },
+  { id: "general",  name: "專科護理通論", desc: "六科共同基礎科目" },
+  { id: "advanced", name: "進階專科護理", desc: "分科專業考試" },
 ];
-window.YEARS = [113, 112, 111, 110, 109];
-window.QUESTIONS = [
-  { id:"Q-INT-113-01",year:113,specialty:"internal",type:"case",stem:"65歲男性，有糖尿病及高血壓病史，近三天出現呼吸喘、雙下肢水腫、夜間端坐呼吸。理學檢查發現頸靜脈怒張、肺底囉音、心尖搏動向左下偏移。下列何者為最可能的診斷？",options:[{key:"A",text:"急性肺栓塞"},{key:"B",text:"慢性鬱血性心臟衰竭急性惡化"},{key:"C",text:"張力性氣胸"},{key:"D",text:"急性腎絲球腎炎"}],answer:"B",answerText:"慢性鬱血性心臟衰竭急性惡化",explanation:{summary:"病人具備典型左心衰竭症狀（端坐呼吸、肺囉音）與右心衰竭症狀（頸靜脈怒張、下肢水腫），合併糖尿病/高血壓等心衰危險因子，符合鬱血性心衰急性惡化表現。",points:["Framingham 心衰診斷標準：主要條件如端坐呼吸、頸靜脈怒張、肺囉音、心臟擴大","心尖搏動左下偏移代表心臟擴大、左心室擴張","急性肺栓塞通常為突發性、單側症狀，較少雙下肢對稱性水腫"],keyword:"Heart Failure, NYHA Classification, Framingham criteria"},source:"示範題庫（依公開命題大綱整理）"},
-  { id:"Q-INT-113-02",year:113,specialty:"internal",type:"calc",stem:"病人體重70公斤，醫囑開立 Vancomycin 15 mg/kg q12h IV。藥師配送 Vancomycin 500 mg/vial，每劑應給予幾vial？",options:[{key:"A",text:"1.5 vial"},{key:"B",text:"2 vial"},{key:"C",text:"2.1 vial"},{key:"D",text:"3 vial"}],answer:"C",answerText:"2.1 vial",explanation:{summary:"70 kg × 15 mg/kg = 1050 mg；1050 / 500 = 2.1 vial。",points:["計算順序：體重 × 劑量 = 每劑總量","每劑總量 ÷ 單一vial含量 = 所需vial數","實務上 Vancomycin 須監測 trough level 維持 10–20 µg/mL"],keyword:"Vancomycin dosing, weight-based calculation"},source:"示範題庫"},
-  { id:"Q-INT-112-01",year:112,specialty:"internal",type:"concept",stem:"下列關於慢性阻塞性肺病（COPD）急性惡化處置的敘述，何者錯誤？",options:[{key:"A",text:"目標血氧飽和度應維持在 88–92%"},{key:"B",text:"短效支氣管擴張劑為第一線治療"},{key:"C",text:"全部病人均需給予全身性類固醇 14 天以上"},{key:"D",text:"化膿性痰量增加時可考慮抗生素治療"}],answer:"C",answerText:"全部病人均需給予全身性類固醇 14 天以上",explanation:{summary:"GOLD 指引建議全身性類固醇 5 天為標準療程；過長療程會增加副作用（高血糖、感染、骨質疏鬆）而無額外效益。",points:["Prednisolone 40 mg/day × 5 days 為常用方案","氧療目標 88–92%，避免 CO₂ retention 惡化","抗生素適應症：Anthonisen 三大症狀（痰量、痰膿、喘）≥2"],keyword:"COPD AE, GOLD guideline 2023, systemic corticosteroid"},source:"示範題庫"},
-  { id:"Q-PSY-113-01",year:113,specialty:"psych",type:"case",stem:"28歲女性，近一週情緒高昂、語速快、自覺有特殊使命可拯救世界，3天未睡仍精神奕奕，刷卡買下大量名牌包。下列何者為最可能的診斷？",options:[{key:"A",text:"重鬱症發作"},{key:"B",text:"躁症發作（雙相情緒障礙第一型）"},{key:"C",text:"廣泛性焦慮症"},{key:"D",text:"短暫精神病"}],answer:"B",answerText:"躁症發作（雙相情緒障礙第一型）",explanation:{summary:"情緒高昂 ≥ 1 週、合併睡眠需求降低、誇大妄想、過度消費，符合 DSM-5 躁症 (Mania) 診斷標準。",points:["DSM-5 躁症：情緒高昂或易怒 + ≥3 項症狀（DIGFAST）","持續 ≥1 週 或需住院即可診斷","第一線治療：Lithium 或 Valproate；嚴重時加 Atypical antipsychotic"],keyword:"Bipolar I disorder, mania, DSM-5"},source:"示範題庫"},
-  { id:"Q-PSY-112-01",year:112,specialty:"psych",type:"concept",stem:"服用 SSRIs 抗鬱劑時，下列何者為「血清素症候群（Serotonin syndrome）」的典型三主徵？",options:[{key:"A",text:"意識改變、自主神經失調、神經肌肉異常"},{key:"B",text:"高燒、肌肉僵直、CPK上升"},{key:"C",text:"口乾、便秘、視力模糊"},{key:"D",text:"心搏徐緩、低血壓、嗜睡"}],answer:"A",answerText:"意識改變、自主神經失調、神經肌肉異常",explanation:{summary:"Serotonin syndrome 三主徵：mental status change、autonomic instability、neuromuscular hyperactivity。",points:["與 NMS 鑑別：NMS 為神經阻斷劑引起，肌肉僵直、CPK 明顯上升","處置：停藥、支持性療法、benzodiazepine、嚴重時 cyproheptadine"],keyword:"Serotonin syndrome, SSRI, NMS"},source:"示範題庫"},
-  { id:"Q-PED-113-01",year:113,specialty:"pediatric",type:"case",stem:"3歲男童，因發燒5天合併雙側結膜充血（無分泌物）、口唇紅裂、頸部淋巴結腫大、軀幹紅疹及手腳末端硬性水腫至急診。下列何項處置最為適當？",options:[{key:"A",text:"口服抗生素 7 天並追蹤"},{key:"B",text:"立即住院，給予 IVIG 2 g/kg + 高劑量 Aspirin"},{key:"C",text:"退燒及支持療法即可"},{key:"D",text:"立即進行扁桃腺切除"}],answer:"B",answerText:"立即住院，給予 IVIG 2 g/kg + 高劑量 Aspirin",explanation:{summary:"符合川崎氏症典型五大臨床準則，需於發病 10 天內給予 IVIG 以降低冠狀動脈瘤風險。",points:["診斷：發燒 ≥5 天 + ≥4/5 主要表現","IVIG 2 g/kg 單次靜脈輸注 + 高劑量 Aspirin","需安排心臟超音波追蹤冠狀動脈"],keyword:"Kawasaki disease, IVIG, coronary artery aneurysm"},source:"示範題庫"},
-  { id:"Q-PED-112-01",year:112,specialty:"pediatric",type:"calc",stem:"10公斤兒童因急性腸胃炎導致中度脫水，依公斤體重計算每日維持液量（Holliday-Segar），應給予多少 mL？",options:[{key:"A",text:"500 mL"},{key:"B",text:"1000 mL"},{key:"C",text:"1200 mL"},{key:"D",text:"1500 mL"}],answer:"B",answerText:"1000 mL",explanation:{summary:"Holliday-Segar 公式：0–10 kg 每公斤 100 mL/day。10 × 100 = 1000 mL。",points:["0–10 kg：100 mL/kg","10–20 kg：1000 + 50 mL/kg（>10kg 部分）",">20 kg：1500 + 20 mL/kg（>20kg 部分）"],keyword:"Holliday-Segar, maintenance fluid, pediatric IV"},source:"示範題庫"},
-  { id:"Q-SUR-113-01",year:113,specialty:"surgery",type:"case",stem:"55歲男性，因車禍鈍挫傷至急診，意識清楚但血壓80/50 mmHg、心跳130/min、腹部膨脹及壓痛。FAST超音波顯示右上腹自由液體。下列處置何者最優先？",options:[{key:"A",text:"立即電腦斷層檢查"},{key:"B",text:"建立大口徑靜脈輸液管路並準備緊急剖腹探查"},{key:"C",text:"腹部 X 光檢查"},{key:"D",text:"口服止痛藥並觀察"}],answer:"B",answerText:"建立大口徑靜脈輸液管路並準備緊急剖腹探查",explanation:{summary:"FAST 陽性合併血流動力學不穩，依 ATLS 原則應即刻復甦並進入手術室。",points:["ATLS: ABCDE 評估 + 大口徑 IV (16–18G) ×2","Blood pressure instability + positive FAST → OR","血流動力學穩定者才考慮 CT 進一步評估"],keyword:"Blunt abdominal trauma, FAST, ATLS"},source:"示範題庫"},
-  { id:"Q-SUR-112-01",year:112,specialty:"surgery",type:"concept",stem:"下列關於手術部位感染（SSI）預防的敘述，何者最為適當？",options:[{key:"A",text:"預防性抗生素應於皮膚切開後 1 小時內給予"},{key:"B",text:"預防性抗生素應於皮膚切開前 30–60 分鐘給予"},{key:"C",text:"預防性抗生素應持續使用 7 天"},{key:"D",text:"術前 24 小時應以剃刀完整剃毛"}],answer:"B",answerText:"預防性抗生素應於皮膚切開前 30–60 分鐘給予",explanation:{summary:"CDC/SHEA 建議於切皮前 30–60 分鐘給予預防性抗生素。",points:["Timing：incision 前 30–60 min","Duration：通常 24 小時內停止","剃毛使用 clipper 而非 razor"],keyword:"SSI prevention, prophylactic antibiotics, CDC guideline"},source:"示範題庫"},
-  { id:"Q-OBG-113-01",year:113,specialty:"obgyn",type:"case",stem:"32歲孕婦，妊娠34週，主訴頭痛、視力模糊。BP 168/110 mmHg，蛋白尿 3+，下肢水腫。下列處置何者最適當？",options:[{key:"A",text:"門診追蹤血壓，一週後回診"},{key:"B",text:"住院並給予 MgSO₄ 預防抽搐、控制血壓、評估生產時機"},{key:"C",text:"立即給予口服利尿劑"},{key:"D",text:"鼓勵多休息、限水即可"}],answer:"B",answerText:"住院並給予 MgSO₄ 預防抽搐、控制血壓、評估生產時機",explanation:{summary:"符合重度子癇前症診斷。MgSO₄ 為預防子癇症抽搐的首選藥物。",points:["MgSO₄ loading 4–6 g IV / 20 min，maintenance 1–2 g/hr","降壓首選：Labetalol、Hydralazine、Nifedipine","≥34 週可考慮終止妊娠"],keyword:"Severe preeclampsia, MgSO4, antihypertensive in pregnancy"},source:"示範題庫"},
-  { id:"Q-OBG-112-01",year:112,specialty:"obgyn",type:"concept",stem:"正常足月新生兒之 Apgar 評分項目，下列何者「不」包括在內？",options:[{key:"A",text:"心跳"},{key:"B",text:"呼吸"},{key:"C",text:"體溫"},{key:"D",text:"肌肉張力"}],answer:"C",answerText:"體溫",explanation:{summary:"Apgar 五項：Appearance、Pulse、Grimace、Activity、Respiration，不含體溫。",points:["出生後 1 分鐘 與 5 分鐘各評一次","每項 0–2 分，總分 0–10","<7 分代表需要進一步評估或復甦"],keyword:"Apgar score, neonatal assessment"},source:"示範題庫"},
-  { id:"Q-ANE-113-01",year:113,specialty:"anesth",type:"case",stem:"全身麻醉中病人突然出現體溫快速上升 (>39°C)、肌肉僵直、PetCO₂ 上升、心搏過速。最可能的診斷及最關鍵處置為何？",options:[{key:"A",text:"敗血症；給予廣效抗生素"},{key:"B",text:"惡性高熱；停止揮發性麻醉劑並給予 Dantrolene"},{key:"C",text:"甲狀腺風暴；給予 PTU"},{key:"D",text:"輸血反應；停止輸血"}],answer:"B",answerText:"惡性高熱；停止揮發性麻醉劑並給予 Dantrolene",explanation:{summary:"Malignant hyperthermia 為遺傳性 ryanodine receptor 缺陷。Dantrolene 2.5 mg/kg IV 為救命解毒劑。",points:["立即停止誘發劑，改用全靜脈麻醉 (TIVA)","Dantrolene 2.5 mg/kg IV，必要時可重複至 10 mg/kg","降溫、處理電解質（尤其高鉀）"],keyword:"Malignant hyperthermia, Dantrolene, RYR1"},source:"示範題庫"},
-  { id:"Q-ANE-112-01",year:112,specialty:"anesth",type:"concept",stem:"下列關於 ASA 麻醉分級的敘述，何者正確？",options:[{key:"A",text:"ASA I：健康病人"},{key:"B",text:"ASA II：嚴重系統性疾病、無法執行日常活動"},{key:"C",text:"ASA III：瀕死狀態"},{key:"D",text:"ASA V：腦死器官捐贈者"}],answer:"A",answerText:"ASA I：健康病人",explanation:{summary:"ASA Physical Status Classification：I 健康、II 輕度系統性疾病、III 嚴重系統性疾病但未失能、IV 嚴重失能且危及生命、V 瀕死、VI 腦死器官捐贈。",points:["E (Emergency) 可加於任何級別之後","用於術前風險評估、麻醉計畫依據"],keyword:"ASA classification, preoperative assessment"},source:"示範題庫"},
-];
+window.YEARS = [114, 113, 112, 111, 110, 109];
+window.QUESTIONS = []; // loaded from questions.json at runtime
 window.PASS_STATS = {
   yearly: [
     { year: 109, applied: 1320, passed: 856, rate: 64.8 },
@@ -1098,9 +1084,25 @@ function Flashcard({ deck, onExit }) {
               <div><div className="flash-answer-label">正確答案</div><div className="flash-answer-text">{q.answerText}</div></div>
             </div>
             <div className="flash-explain">
-              <h4><MedIcon name="lightbulb" size={11}/> 題解</h4><p>{q.explanation.summary}</p>
-              <h4><MedIcon name="bookmark" size={11}/> 重點整理</h4><ul>{q.explanation.points.map((p, i) => <li key={i}>{p}</li>)}</ul>
-              <h4><MedIcon name="search" size={11}/> 關鍵字</h4><p style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--ink-2)" }}>{q.explanation.keyword}</p>
+              {q.explanation ? (
+                <React.Fragment>
+                  <h4><MedIcon name="lightbulb" size={11}/> 題解</h4><p>{q.explanation.summary}</p>
+                  {q.explanation.points && <React.Fragment>
+                    <h4><MedIcon name="bookmark" size={11}/> 重點整理</h4>
+                    <ul>{q.explanation.points.map((p, i) => <li key={i}>{p}</li>)}</ul>
+                  </React.Fragment>}
+                  {q.explanation.keyword && <React.Fragment>
+                    <h4><MedIcon name="search" size={11}/> 關鍵字</h4>
+                    <p style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--ink-2)" }}>{q.explanation.keyword}</p>
+                  </React.Fragment>}
+                </React.Fragment>
+              ) : (
+                <div style={{ padding: "20px 0", color: "var(--ink-3)", fontSize: 13, lineHeight: 1.7 }}>
+                  <h4 style={{ color: "var(--accent)" }}><MedIcon name="lightbulb" size={11}/> 解答</h4>
+                  <p>本題正確答案為 <strong style={{ color: "var(--accent)", fontFamily: "var(--font-mono)" }}>({q.answer})</strong>　{q.answerText}</p>
+                  <p style={{ fontSize: 12, marginTop: 12, color: "var(--ink-3)" }}>※ 詳細題解尚未建置，可參考衛福部公告之原始試題與標準答案。</p>
+                </div>
+              )}
               <div className="flash-source"><div className="flash-source-label"><MedIcon name="book-open" size={10}/> 參考來源</div>{q.source}</div>
             </div>
           </div>
@@ -1294,12 +1296,14 @@ function ReviewToday({ onPickDeck }) {
 // ===== Syllabus =====
 function Syllabus() {
   const topics = {
+    general: ["專科護理師角色","護理倫理與法規","溝通協調","實證與品質","教學與研究","健康促進"],
     internal: ["心血管系統","呼吸系統","消化系統","腎臟與電解質","內分泌與代謝","感染症與抗生素"],
     psych: ["情緒障礙","焦慮與創傷","精神病性疾患","物質使用","兒童青少年精神","老年精神"],
     pediatric: ["新生兒急症","兒童成長發展","常見感染症","兒童腫瘤","先天性疾病","兒童急重症"],
     surgery: ["外傷處置","急性腹症","圍術期照護","外科感染","燒燙傷","外科腫瘤"],
     obgyn: ["產前照護","高危險妊娠","分娩處置","婦科常見疾病","婦癌篩檢","更年期"],
     anesth: ["麻醉前評估","全身麻醉","區域麻醉","麻醉併發症","疼痛管理","麻醉藥理"],
+    family: ["家庭醫學","慢性病管理","預防醫學","老年照護","婦幼健康","社區醫療"],
   };
   return (
     <div className="fade-in">
@@ -1410,7 +1414,33 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+// Load questions from external JSON before rendering
+function Loading() {
+  return (
+    <div style={{position:"fixed",inset:0,display:"grid",placeItems:"center",background:"var(--bg)",color:"var(--ink-1)"}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{width:48,height:48,border:"3px solid var(--surface-alt)",borderTopColor:"var(--accent)",borderRadius:"50%",margin:"0 auto 16px",animation:"spin 0.8s linear infinite"}}></div>
+        <div style={{fontSize:14,color:"var(--ink-2)",letterSpacing:"0.06em"}}>載入題庫中…</div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    </div>
+  );
+}
+
+const rootEl = ReactDOM.createRoot(document.getElementById("root"));
+rootEl.render(<Loading />);
+
+fetch("questions.json")
+  .then(r => r.json())
+  .then(data => {
+    window.QUESTIONS = data;
+    rootEl.render(<App />);
+  })
+  .catch(err => {
+    console.error("Failed to load questions.json", err);
+    window.QUESTIONS = [];
+    rootEl.render(<App />);
+  });
   </script>
 </body>
 </html>
