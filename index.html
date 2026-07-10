@@ -545,6 +545,9 @@ table.spec-table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
 .auth-divider { display: flex; align-items: center; gap: 12px; margin: 6px 0; color: var(--ink-3); font-size: 12px; font-family: var(--font-mono); }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 .auth-demo { background: transparent; color: var(--ink-2); border: 1px solid var(--border-strong); padding: 12px 16px; border-radius: 10px; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s; }
+.google-signin-btn { display: inline-flex; align-items: center; justify-content: center; gap: 12px; width: 100%; padding: 14px 20px; background: white; color: #1f1f1f; border: 1px solid var(--border); border-radius: 10px; font-size: 15px; font-weight: 600; letter-spacing: 0.01em; cursor: pointer; transition: all 0.18s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); font-family: var(--font-sans); }
+.google-signin-btn:hover:not(:disabled) { background: #f5f5f5; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+.google-signin-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .auth-demo:hover { background: var(--surface-alt); color: var(--accent); border-color: var(--accent); }
 .auth-tos { font-size: 11.5px; color: var(--ink-3); line-height: 1.6; margin: 14px 0 0; text-align: center; }
 
@@ -651,34 +654,92 @@ window.PASS_STATS = {
   ],
 };
 
-// Auth
-var USERS_KEY = "np_users";
-var SESSION_KEY = "np_session";
-function getUsers() { try { return JSON.parse(localStorage.getItem(USERS_KEY) || "{}"); } catch(e) { return {}; } }
-function saveUsers(u) { localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
-function hashPwd(s) { var h = 0; for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0; return "h" + Math.abs(h).toString(36); }
+  </script>
+
+  <!-- Firebase Auth + Firestore (雲端帳號，取代原本只存本機的 localStorage 登入；帳號跨裝置同步) -->
+  <script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc, collection, onSnapshot, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBrs80vpFVe-iEh5ctzRWfYHUBb3KGvILo",
+  authDomain: "speech-to-text-2f776.firebaseapp.com",
+  projectId: "speech-to-text-2f776",
+  storageBucket: "speech-to-text-2f776.firebasestorage.app",
+  messagingSenderId: "283739023798",
+  appId: "1:283739023798:web:3091ec2bcf6262b5ecb917"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const USERS_COL = "np_learning_users";   // 與 np-anesthesia 分開，避免混用
+window.ADMIN_EMAIL = "jiahowchang@gmail.com";
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
+
+let cachedProfile = null;   // Firebase 使用者的 profile
+let guestProfile = null;    // 訪客（本機，不寫入雲端）
+const authListeners = new Set();
+const notify = () => authListeners.forEach(fn => fn(guestProfile || cachedProfile));
+
+getRedirectResult(auth).catch(e => console.warn("Redirect result error", e));
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { cachedProfile = null; notify(); return; }
+  guestProfile = null; // 真正登入後即取消訪客身分
+  try {
+    const snap = await getDoc(doc(db, USERS_COL, user.uid));
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.status === "disabled") {
+        await signOut(auth); cachedProfile = null;
+        alert("您的帳號已被管理員停用。如有疑問請聯絡 " + window.ADMIN_EMAIL);
+        notify(); return;
+      }
+      try { updateDoc(doc(db, USERS_COL, user.uid), { lastLoginAt: serverTimestamp() }); } catch(e) {}
+      cachedProfile = { uid: user.uid, ...data, isAdmin: user.email === window.ADMIN_EMAIL, needsProfile: false };
+    } else {
+      cachedProfile = { uid: user.uid, email: user.email, name: user.displayName || (user.email || "").split("@")[0], photoURL: user.photoURL || null, isAdmin: user.email === window.ADMIN_EMAIL, needsProfile: true };
+    }
+    notify();
+  } catch (e) { console.error("Profile load failed", e); cachedProfile = null; notify(); }
+});
+
 window.AuthAPI = {
-  current: function() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch(e) { return null; } },
-  register: function(o) {
-    var users = getUsers();
-    if (users[o.email]) throw new Error("此 Email 已註冊");
-    if (o.password.length < 6) throw new Error("密碼至少 6 個字元");
-    users[o.email] = { name: o.name, email: o.email, role: o.role, experience: o.experience||"", hospital: o.hospital||"", examGroup: o.examGroup||"", pwd: hashPwd(o.password), createdAt: new Date().toISOString() };
-    saveUsers(users);
-    var session = { name: o.name, email: o.email, role: o.role, experience: o.experience, hospital: o.hospital, examGroup: o.examGroup };
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    return session;
+  current: () => guestProfile || cachedProfile,
+  subscribe: (fn) => { authListeners.add(fn); return () => authListeners.delete(fn); },
+  signInWithGoogle: async () => {
+    try { await signInWithPopup(auth, googleProvider); }
+    catch (e) {
+      if (e.code === "auth/popup-blocked" || e.code === "auth/cancelled-popup-request" || e.code === "auth/operation-not-supported-in-this-environment") { await signInWithRedirect(auth, googleProvider); }
+      else throw e;
+    }
   },
-  login: function(o) {
-    var users = getUsers();
-    var u = users[o.email];
-    if (!u) throw new Error("此 Email 尚未註冊");
-    if (u.pwd !== hashPwd(o.password)) throw new Error("密碼錯誤");
-    var session = { name: u.name, email: u.email, role: u.role, experience: u.experience, hospital: u.hospital, examGroup: u.examGroup };
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    return session;
+  registerWithEmail: async (email, password) => { await createUserWithEmailAndPassword(auth, email.trim(), password); },
+  signInWithEmail: async (email, password) => { await signInWithEmailAndPassword(auth, email.trim(), password); },
+  resetPassword: async (email) => { await sendPasswordResetEmail(auth, email.trim()); },
+  guestLogin: () => { guestProfile = { uid: "guest", email: "guest@local", name: "訪客", role: "other", isGuest: true, isAdmin: false, needsProfile: false }; notify(); },
+  completeProfile: async ({ name, role, experience, hospital, examGroup }) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error("尚未登入");
+    const profileToSave = { uid: user.uid, email: user.email, name: name || user.displayName || "", role: role || "trainee", experience: experience || "", hospital: hospital || "", examGroup: examGroup || "", photoURL: user.photoURL || null, status: "active", createdAt: serverTimestamp(), lastLoginAt: serverTimestamp() };
+    try { await setDoc(doc(db, USERS_COL, user.uid), profileToSave); }
+    catch (e) { console.error("completeProfile setDoc failed:", e); throw new Error("儲存失敗：" + (e.code || e.message || "未知錯誤")); }
+    try { const snap = await getDoc(doc(db, USERS_COL, user.uid)); const data = snap.exists() ? snap.data() : profileToSave; cachedProfile = { uid: user.uid, ...data, isAdmin: user.email === window.ADMIN_EMAIL, needsProfile: false }; }
+    catch (e) { cachedProfile = { uid: user.uid, ...profileToSave, createdAt: null, lastLoginAt: null, isAdmin: user.email === window.ADMIN_EMAIL, needsProfile: false }; }
+    notify(); return cachedProfile;
   },
-  logout: function() { localStorage.removeItem(SESSION_KEY); },
+  logout: async () => { guestProfile = null; notify(); try { await signOut(auth); } catch(e) {} },
+};
+
+window.AdminAPI = {
+  subscribeUsers: (callback) => {
+    const q = query(collection(db, USERS_COL), orderBy("createdAt", "desc"));
+    return onSnapshot(q, (snap) => { const users = []; snap.forEach(d => users.push({ uid: d.id, ...d.data() })); callback(users); }, (err) => { console.error("subscribeUsers error", err); callback([]); });
+  },
+  setStatus: async (uid, status) => { await updateDoc(doc(db, USERS_COL, uid), { status, statusUpdatedAt: serverTimestamp() }); },
+  deleteProfile: async (uid) => { await deleteDoc(doc(db, USERS_COL, uid)); },
 };
   </script>
 
@@ -746,12 +807,13 @@ function NavIcon({ name }) {
     case "chart": return <svg viewBox="0 0 24 24" {...s}><path d="M4 20V8"/><path d="M10 20V4"/><path d="M16 20v-9"/><path d="M22 20H2"/></svg>;
     case "book": return <svg viewBox="0 0 24 24" {...s}><path d="M4 4h12a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4V4Z"/><path d="M4 16a4 4 0 0 1 4-4h12"/></svg>;
     case "info": return <svg viewBox="0 0 24 24" {...s}><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="8" r=".5" fill="currentColor"/></svg>;
+    case "shield": return <svg viewBox="0 0 24 24" {...s}><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/></svg>;
     default: return null;
   }
 }
 
 // ===== Sidebar =====
-function Sidebar({ currentPage, onNav, decks }) {
+function Sidebar({ currentPage, onNav, decks, isAdmin }) {
   const totalCards = window.QUESTIONS.length;
   const items = [
     { id: "home", label: "總覽", icon: "home" },
@@ -763,6 +825,7 @@ function Sidebar({ currentPage, onNav, decks }) {
     { id: "syllabus", label: "命題大綱", icon: "book" },
     { id: "about", label: "關於本站", icon: "info" },
   ];
+  if (isAdmin) refs.push({ id: "admin", label: "使用者管理", icon: "shield" });
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -804,25 +867,64 @@ function Sidebar({ currentPage, onNav, decks }) {
 }
 
 // ===== Auth Screen =====
-function AuthScreen({ onLogin }) {
-  const [mode, setMode] = useState("login");
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "trainee", experience: "", hospital: "", examGroup: "" });
+// 偵測 App 內建瀏覽器（LINE/FB/IG/Messenger/WeChat/WebView）— 這些會擋 Google 登入 (disallowed_useragent)
+function isInAppBrowser() {
+  const ua = navigator.userAgent || "";
+  return /FBAN|FBAV|FB_IAB|Instagram|\bLine\/|MicroMessenger|Messenger|KAKAOTALK|\bGSA\b|; wv\)/i.test(ua);
+}
+
+function AuthScreen() {
   const [err, setErr] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
-  const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const submit = async (e) => {
-    e.preventDefault(); setErr("");
-    if (mode === "register") {
-      if (!form.experience) return setErr("請選擇臨床年資");
-      if (!form.hospital.trim()) return setErr("請填寫目前服務醫院");
-      if (!form.examGroup) return setErr("請選擇報考組別");
+  const [mode, setMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [copied, setCopied] = useState(false);
+  const inApp = isInAppBrowser();
+  const handleGoogle = async () => {
+    setErr(""); setNotice(""); setLoading(true);
+    try { await window.AuthAPI.signInWithGoogle(); }
+    catch (ex) {
+      const code = ex.code || ""; let msg = ex.message || "登入失敗";
+      if (code === "auth/popup-closed-by-user") msg = "登入視窗已關閉";
+      else if (code === "auth/cancelled-popup-request") msg = "已取消登入";
+      else if (code === "auth/network-request-failed") msg = "網路錯誤，請檢查連線";
+      else if (code === "auth/unauthorized-domain") msg = "此網域未授權使用此登入方式，請聯絡管理員 jiahowchang@gmail.com";
+      else if (code === "auth/operation-not-supported-in-this-environment" || code === "auth/web-storage-unsupported") msg = "此瀏覽器不支援 Google 登入，請改用下方 Email 登入，或用 Safari／Chrome 開啟本站。";
+      setErr(msg); setLoading(false);
     }
+  };
+  const handleEmail = async (e) => {
+    e.preventDefault(); setErr(""); setNotice("");
+    if (!email.trim()) return setErr("請輸入 Email");
+    if (pw.length < 6) return setErr("密碼至少需 6 個字元");
     setLoading(true);
     try {
-      await new Promise(r => setTimeout(r, 300));
-      const session = mode === "login" ? window.AuthAPI.login({ email: form.email, password: form.password }) : window.AuthAPI.register(form);
-      onLogin(session);
-    } catch (ex) { setErr(ex.message); } finally { setLoading(false); }
+      if (mode === "register") await window.AuthAPI.registerWithEmail(email, pw);
+      else await window.AuthAPI.signInWithEmail(email, pw);
+    } catch (ex) {
+      const c = ex.code || ""; let m = "登入失敗，請再試一次";
+      if (c === "auth/email-already-in-use") m = "此 Email 已註冊過，請改用「登入」";
+      else if (c === "auth/invalid-email") m = "Email 格式不正確";
+      else if (c === "auth/weak-password") m = "密碼至少需 6 個字元";
+      else if (c === "auth/wrong-password" || c === "auth/invalid-credential" || c === "auth/invalid-login-credentials") m = "Email 或密碼錯誤";
+      else if (c === "auth/user-not-found") m = "查無此帳號，請先點「註冊」";
+      else if (c === "auth/too-many-requests") m = "嘗試次數過多，請稍後再試";
+      else if (c === "auth/network-request-failed") m = "網路錯誤，請檢查連線";
+      else if (c === "auth/operation-not-allowed") m = "Email 登入尚未啟用，請聯絡管理員 jiahowchang@gmail.com";
+      setErr(m); setLoading(false);
+    }
+  };
+  const handleReset = async () => {
+    setErr(""); setNotice("");
+    if (!email.trim()) return setErr("請先在上方輸入 Email，再點忘記密碼");
+    try { await window.AuthAPI.resetPassword(email); setNotice("已寄出密碼重設信至 " + email.trim() + "，請查看信箱（含垃圾郵件匣）。"); }
+    catch (ex) { const c = ex.code || ""; setErr(c === "auth/user-not-found" ? "查無此 Email 帳號" : c === "auth/invalid-email" ? "Email 格式不正確" : "寄送失敗，請稍後再試"); }
+  };
+  const copyUrl = async () => {
+    try { await navigator.clipboard.writeText(location.href); setCopied(true); setTimeout(() => setCopied(false), 2200); }
+    catch (e) { const ta = document.createElement("textarea"); ta.value = location.href; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); setCopied(true); setTimeout(() => setCopied(false), 2200); } catch(_){} document.body.removeChild(ta); }
   };
   return (
     <div className="auth-stage">
@@ -846,41 +948,112 @@ function AuthScreen({ onLogin }) {
           <div className="auth-author"><MedIcon name="stethoscope" size={14}/><span>建置者 · 張家豪 醫師</span><span style={{ color: "var(--ink-3)" }}>·</span><span style={{ color: "var(--ink-3)" }}>新竹台大分院 急診醫學部</span></div>
         </div>
         <div className="auth-form-side">
-          <div className="auth-tabs">
-            <button type="button" className={"auth-tab " + (mode === "login" ? "active" : "")} onClick={() => { setMode("login"); setErr(""); }}>登入</button>
-            <button type="button" className={"auth-tab " + (mode === "register" ? "active" : "")} onClick={() => { setMode("register"); setErr(""); }}>註冊新帳號</button>
-          </div>
-          <form onSubmit={submit} className="auth-form">
-            <h2 className="auth-heading">{mode === "login" ? "歡迎回來" : "建立你的學習帳號"}</h2>
-            <p className="auth-sub">{mode === "login" ? "請輸入帳號密碼開始今日複習" : "完成註冊即可使用所有功能"}</p>
-            {mode === "register" && (<>
-              <label className="auth-field"><div className="auth-field-label">姓名<span className="req">*</span></div><input type="text" required placeholder="王小華" value={form.name} onChange={e => update("name", e.target.value)}/></label>
-              <label className="auth-field"><div className="auth-field-label">身分</div>
-                <div className="role-grid">
-                  {[{id:"trainee",label:"訓練中 NP",icon:"stethoscope"},{id:"certified",label:"已甄審 NP",icon:"award"},{id:"other",label:"其他",icon:"users"}].map(r => (
-                    <button type="button" key={r.id} className={"role-pick " + (form.role === r.id ? "active" : "")} onClick={() => update("role", r.id)}><MedIcon name={r.icon} size={16}/><span>{r.label}</span></button>
-                  ))}
-                </div>
-              </label>
-              <div className="field-row">
-                <label className="auth-field"><div className="auth-field-label">臨床年資<span className="req">*</span></div><select required value={form.experience} onChange={e => update("experience", e.target.value)}><option value="">請選擇</option><option value="<1">未滿 1 年</option><option value="1-3">1–3 年</option><option value="3-5">3–5 年</option><option value="5-10">5–10 年</option><option value="10+">10 年以上</option></select></label>
-                <label className="auth-field"><div className="auth-field-label">目前服務醫院<span className="req">*</span></div><input type="text" required placeholder="例：新竹台大分院" value={form.hospital} onChange={e => update("hospital", e.target.value)}/></label>
+          <div className="auth-form" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <h2 className="auth-heading">歡迎回來</h2>
+            <p className="auth-sub" style={{ marginBottom: 22 }}>用 Google 一鍵登入，或用 Email 註冊。第一次使用者登入後完成基本資料。</p>
+            {inApp && (
+              <div style={{ padding: "12px 14px", marginBottom: 18, background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.5)", borderRadius: 10, fontSize: 12.5, color: "var(--ink-1)", lineHeight: 1.65 }}>
+                <div style={{ fontWeight: 700, marginBottom: 4, display: "flex", alignItems: "center", gap: 6, color: "#d97706" }}><MedIcon name="info" size={14}/>偵測到 App 內建瀏覽器</div>
+                您正從 LINE／FB／IG 等 App 內開啟，<b>Google 登入會被擋下</b>。請改用 Safari／Chrome 開啟本站，或直接用下方 <b>Email 登入</b>。
+                <button type="button" onClick={copyUrl} style={{ marginTop: 8, padding: "6px 12px", background: "var(--surface)", border: "1px solid rgba(245,158,11,0.6)", borderRadius: 7, fontSize: 12, fontWeight: 600, color: "#d97706", cursor: "pointer" }}>{copied ? "✓ 已複製，到瀏覽器貼上" : "複製本站網址"}</button>
               </div>
-              <label className="auth-field"><div className="auth-field-label">報考組別<span className="req">*</span></div>
-                <div className="exam-group-grid">
-                  {window.SPECIALTIES.map(s => (
-                    <button type="button" key={s.id} className={"exam-group-pick " + s.className + " " + (form.examGroup === s.id ? "active" : "")} onClick={() => update("examGroup", s.id)}><SpecIcon id={s.id} size={18}/><span>{s.name}</span></button>
-                  ))}
-                </div>
-              </label>
-            </>)}
-            <label className="auth-field"><div className="auth-field-label">Email<span className="req">*</span></div><input type="email" required placeholder="you@example.com" value={form.email} onChange={e => update("email", e.target.value)} autoComplete="email"/></label>
-            <label className="auth-field"><div className="auth-field-label">密碼<span className="req">*</span>{mode === "register" && <span className="hint">至少 6 個字元</span>}</div><input type="password" required minLength={6} placeholder="••••••••" value={form.password} onChange={e => update("password", e.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"}/></label>
+            )}
+            <button type="button" className="google-signin-btn" onClick={handleGoogle} disabled={loading}>
+              <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571.001-.001.002-.001.003-.002l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+              <span>{loading ? "連線中…" : "使用 Google 帳號繼續"}</span>
+            </button>
+            {!inApp && (
+              <p style={{ marginTop: 12, marginBottom: 0, fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.6, textAlign: "center" }}>💡 從 LINE／FB／IG 點進來時 Google 登入可能被擋，請改用 Safari／Chrome 開啟，或用下方 Email 登入。</p>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 18px", color: "var(--ink-3)", fontSize: 12 }}>
+              <div style={{ flex: 1, height: 1, background: "var(--border)" }}></div>或使用 Email<div style={{ flex: 1, height: 1, background: "var(--border)" }}></div>
+            </div>
+            <form onSubmit={handleEmail}>
+              <label className="auth-field"><div className="auth-field-label">Email</div><input type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)}/></label>
+              <label className="auth-field" style={{ marginTop: 12 }}><div className="auth-field-label">密碼 <span style={{ color: "var(--ink-3)", fontWeight: 400 }}>（至少 6 碼）</span></div><input type="password" autoComplete={mode === "register" ? "new-password" : "current-password"} placeholder="••••••" value={pw} onChange={e => setPw(e.target.value)}/></label>
+              <button type="submit" className="auth-submit" style={{ marginTop: 16 }} disabled={loading}>{loading ? "處理中…" : (mode === "register" ? <>註冊並進入<MedIcon name="arrow-right" size={16}/></> : <>Email 登入<MedIcon name="arrow-right" size={16}/></>)}</button>
+            </form>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12, fontSize: 12.5 }}>
+              <button type="button" onClick={() => { setMode(mode === "register" ? "login" : "register"); setErr(""); setNotice(""); }} style={{ background: "none", border: "none", color: "var(--accent-deep)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>{mode === "register" ? "已有帳號？登入" : "沒有帳號？註冊"}</button>
+              {mode !== "register" && <button type="button" onClick={handleReset} style={{ background: "none", border: "none", color: "var(--ink-3)", cursor: "pointer", textDecoration: "underline", padding: 0 }}>忘記密碼？</button>}
+            </div>
+            {err && <div className="auth-error" style={{ marginTop: 16 }}><MedIcon name="info" size={14}/>{err}</div>}
+            {notice && <div style={{ marginTop: 16, padding: "10px 12px", background: "var(--accent-soft)", color: "var(--accent-deep)", borderRadius: 8, fontSize: 12.5, lineHeight: 1.6 }}>{notice}</div>}
+            <button type="button" className="auth-demo" style={{ marginTop: 18, width: "100%" }} onClick={() => window.AuthAPI.guestLogin()}><MedIcon name="play" size={14}/><span>以訪客身分試用</span></button>
+            <p className="auth-tos" style={{ marginTop: 16 }}>登入即表示您同意本平台僅供學習用途；本站內容不作為臨床診療或考試結果之保證。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== 完成基本資料（第一次登入的 Firebase 使用者）=====
+function ProfileCompletion({ user }) {
+  const [form, setForm] = useState({ name: user.name || "", role: "trainee", experience: "", hospital: "", examGroup: "" });
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const submit = async (e) => {
+    e.preventDefault(); setErr("");
+    if (!form.name.trim()) return setErr("請填寫姓名");
+    if (!form.experience) return setErr("請選擇臨床年資");
+    if (!form.hospital.trim()) return setErr("請填寫目前服務醫院");
+    if (!form.examGroup) return setErr("請選擇報考組別");
+    setLoading(true);
+    try { await window.AuthAPI.completeProfile(form); }
+    catch (ex) { setErr(ex.message || "儲存失敗"); } finally { setLoading(false); }
+  };
+  const handleSignOut = async () => { try { await window.AuthAPI.logout(); } catch(e) {} };
+  return (
+    <div className="auth-stage">
+      <div className="auth-bg-grid"></div>
+      <div className="auth-bg-glow"></div>
+      <div className="auth-shell">
+        <div className="auth-brand-side">
+          <div className="auth-brand">
+            <div className="brand-mark" style={{ width: 52, height: 52 }}><MedicalCross size={28}/></div>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.2 }}>專科護理師<br/>學習平台</div>
+              <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 6, letterSpacing: "0.16em", fontFamily: "var(--font-mono)" }}>NURSE PRACTITIONER PREP</div>
+            </div>
+          </div>
+          <div className="auth-tagline">為訓練中的<br/><span style={{ color: "var(--accent)" }}>專科護理師</span><br/>而生的考試準備平台</div>
+          <div className="auth-author"><MedIcon name="stethoscope" size={14}/><span>建置者 · 張家豪 醫師</span><span style={{ color: "var(--ink-3)" }}>·</span><span style={{ color: "var(--ink-3)" }}>新竹台大分院 急診醫學部</span></div>
+        </div>
+        <div className="auth-form-side">
+          <form onSubmit={submit} className="auth-form">
+            <h2 className="auth-heading">完成基本資料</h2>
+            <p className="auth-sub">第一次使用，請填寫以下資料</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, background: "var(--surface-alt)", borderRadius: 10, marginBottom: 16 }}>
+              {user.photoURL ? <img src={user.photoURL} style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--border)" }} alt=""/> : <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--accent-soft)", color: "var(--accent-deep)", display: "grid", placeItems: "center", fontWeight: 700, fontSize: 13 }}>{(user.name || user.email || "?").trim().slice(0, 2).toUpperCase()}</div>}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 10, color: "var(--ink-3)", letterSpacing: "0.08em" }}>{user.photoURL ? "已使用 GOOGLE 登入" : "已驗證 EMAIL 帳號"}</div>
+                <div style={{ fontSize: 12.5, color: "var(--ink-1)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user.email}</div>
+              </div>
+            </div>
+            <label className="auth-field"><div className="auth-field-label">姓名<span className="req">*</span></div><input type="text" required placeholder="王小華" value={form.name} onChange={e => update("name", e.target.value)}/></label>
+            <label className="auth-field"><div className="auth-field-label">身分</div>
+              <div className="role-grid">
+                {[{id:"trainee",label:"訓練中 NP",icon:"stethoscope"},{id:"certified",label:"已甄審 NP",icon:"award"},{id:"other",label:"其他",icon:"users"}].map(r => (
+                  <button type="button" key={r.id} className={"role-pick " + (form.role === r.id ? "active" : "")} onClick={() => update("role", r.id)}><MedIcon name={r.icon} size={16}/><span>{r.label}</span></button>
+                ))}
+              </div>
+            </label>
+            <div className="field-row">
+              <label className="auth-field"><div className="auth-field-label">臨床年資<span className="req">*</span></div><select required value={form.experience} onChange={e => update("experience", e.target.value)}><option value="">請選擇</option><option value="<1">未滿 1 年</option><option value="1-3">1–3 年</option><option value="3-5">3–5 年</option><option value="5-10">5–10 年</option><option value="10+">10 年以上</option></select></label>
+              <label className="auth-field"><div className="auth-field-label">目前服務醫院<span className="req">*</span></div><input type="text" required placeholder="例：新竹台大分院" value={form.hospital} onChange={e => update("hospital", e.target.value)}/></label>
+            </div>
+            <label className="auth-field"><div className="auth-field-label">報考組別<span className="req">*</span></div>
+              <div className="exam-group-grid">
+                {window.SPECIALTIES.map(s => (
+                  <button type="button" key={s.id} className={"exam-group-pick " + s.className + " " + (form.examGroup === s.id ? "active" : "")} onClick={() => update("examGroup", s.id)}><SpecIcon id={s.id} size={18}/><span>{s.name}</span></button>
+                ))}
+              </div>
+            </label>
             {err && <div className="auth-error"><MedIcon name="info" size={14}/>{err}</div>}
-            <button type="submit" className="auth-submit" disabled={loading}>{loading ? "處理中…" : <>{mode === "login" ? "登入" : "建立帳號"}<MedIcon name="arrow-right" size={16}/></>}</button>
-            <div className="auth-divider"><span>或</span></div>
-            <button type="button" className="auth-demo" onClick={() => { const guest = { name: "訪客", email: "guest@local", role: "trainee" }; localStorage.setItem("np_session", JSON.stringify(guest)); onLogin(guest); }}><MedIcon name="play" size={14}/><span>以訪客身分試用</span></button>
-            <p className="auth-tos">註冊即表示您同意本平台僅供學習用途；本站內容不作為臨床診療或考試結果之保證。</p>
+            <button type="submit" className="auth-submit" disabled={loading}>{loading ? "儲存中…" : <>完成並進入平台<MedIcon name="arrow-right" size={16}/></>}</button>
+            <button type="button" onClick={handleSignOut} style={{ marginTop: 12, padding: "8px 16px", background: "transparent", color: "var(--ink-3)", border: "none", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>登出 · 使用其他帳號</button>
           </form>
         </div>
       </div>
@@ -1352,18 +1525,101 @@ function About() {
   );
 }
 
+// ===== 使用者管理（管理員專屬）=====
+function AdminPanel() {
+  const [users, setUsers] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  useEffect(() => {
+    const unsub = window.AdminAPI.subscribeUsers((list) => { setUsers(list); setLoaded(true); });
+    return () => { if (typeof unsub === "function") unsub(); };
+  }, []);
+  const stats = useMemo(() => ({ total: users.length, active: users.filter(u => u.status !== "disabled").length, disabled: users.filter(u => u.status === "disabled").length }), [users]);
+  const filtered = users.filter(u => {
+    if (filter === "active" && u.status === "disabled") return false;
+    if (filter === "disabled" && u.status !== "disabled") return false;
+    if (query) { const q = query.toLowerCase(); if (!(u.name||"").toLowerCase().includes(q) && !(u.email||"").toLowerCase().includes(q) && !(u.hospital||"").toLowerCase().includes(q)) return false; }
+    return true;
+  });
+  const fmtDate = (ts) => { if (!ts) return "—"; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.getFullYear()+"/"+String(d.getMonth()+1).padStart(2,'0')+"/"+String(d.getDate()).padStart(2,'0'); };
+  const specName = (id) => { const s = (window.SPECIALTIES||[]).find(x => x.id === id); return s ? s.name : (id || "—"); };
+  const toggleStatus = async (u) => { const ns = u.status === "disabled" ? "active" : "disabled"; try { await window.AdminAPI.setStatus(u.uid, ns); } catch(e) { alert("更新失敗：" + e.message); } };
+  const doDelete = async (u) => { try { await window.AdminAPI.deleteProfile(u.uid); setConfirmDelete(null); } catch(e) { alert("刪除失敗：" + e.message); } };
+  const th = { textAlign: "left", padding: "10px 12px", fontSize: 12, color: "var(--ink-3)", fontWeight: 600, borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" };
+  const td = { padding: "10px 12px", fontSize: 13, color: "var(--ink-2)", borderBottom: "1px solid var(--border)", verticalAlign: "top" };
+  const chip = (active) => ({ padding: "5px 12px", borderRadius: 8, border: "1px solid var(--border)", background: active ? "var(--accent-soft)" : "transparent", color: active ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", fontSize: 12.5, fontWeight: 600 });
+  return (
+    <div className="fade-in">
+      <div className="page-head"><div>
+        <h1 className="page-title">使用者管理</h1>
+        <p className="page-sub">管理員專屬 · 共 {stats.total} 人（啟用 {stats.active}、停用 {stats.disabled}）</p>
+      </div></div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        <button style={chip(filter==="all")} onClick={() => setFilter("all")}>全部 {stats.total}</button>
+        <button style={chip(filter==="active")} onClick={() => setFilter("active")}>啟用中 {stats.active}</button>
+        <button style={chip(filter==="disabled")} onClick={() => setFilter("disabled")}>已停用 {stats.disabled}</button>
+        <input placeholder="搜尋 姓名 / Email / 醫院" value={query} onChange={e => setQuery(e.target.value)} style={{ flex: 1, minWidth: 200, padding: "7px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--ink-1)", fontSize: 13 }} />
+      </div>
+      <div style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "auto", background: "var(--surface)" }}>
+        {!loaded ? <div style={{ padding: 40, textAlign: "center", color: "var(--ink-3)" }}>載入中…</div>
+         : filtered.length === 0 ? <div style={{ padding: 40, textAlign: "center", color: "var(--ink-3)" }}>目前沒有符合條件的使用者</div>
+         : (
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
+            <thead><tr><th style={th}>使用者</th><th style={th}>身分 / 年資</th><th style={th}>報考組別</th><th style={th}>服務醫院</th><th style={th}>註冊</th><th style={th}>狀態</th><th style={th}>操作</th></tr></thead>
+            <tbody>
+              {filtered.map(u => {
+                const disabled = u.status === "disabled";
+                const isMe = u.email === window.ADMIN_EMAIL;
+                return (
+                  <tr key={u.uid} style={{ opacity: disabled ? 0.55 : 1 }}>
+                    <td style={td}><div style={{ fontWeight: 600, color: "var(--ink-1)" }}>{u.name || "—"}{isMe && <span style={{ marginLeft: 6, fontSize: 10, color: "var(--accent-deep)" }}>（管理員）</span>}</div><div style={{ fontSize: 11.5, color: "var(--ink-3)", fontFamily: "var(--font-mono)" }}>{u.email}</div></td>
+                    <td style={td}>{u.role === "certified" ? "已甄審 NP" : u.role === "other" ? "其他" : "訓練中 NP"}<div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{u.experience || "—"}</div></td>
+                    <td style={td}>{specName(u.examGroup)}</td>
+                    <td style={td}>{u.hospital || "—"}</td>
+                    <td style={td}>{fmtDate(u.createdAt)}</td>
+                    <td style={td}><span style={{ padding: "3px 9px", borderRadius: 20, fontSize: 11.5, fontWeight: 600, background: disabled ? "rgba(239,68,68,0.15)" : "rgba(34,197,94,0.15)", color: disabled ? "#ef4444" : "#22c55e" }}>{disabled ? "已停用" : "啟用中"}</span></td>
+                    <td style={td}>
+                      {isMe ? <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>—</span> : confirmDelete === u.uid ? (
+                        <span style={{ display: "inline-flex", gap: 6 }}>
+                          <button onClick={() => doDelete(u)} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "#ef4444", color: "#fff", fontSize: 11.5, cursor: "pointer" }}>確認刪除</button>
+                          <button onClick={() => setConfirmDelete(null)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--ink-2)", fontSize: 11.5, cursor: "pointer" }}>取消</button>
+                        </span>
+                      ) : (
+                        <span style={{ display: "inline-flex", gap: 6 }}>
+                          <button onClick={() => toggleStatus(u)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--ink-2)", fontSize: 11.5, cursor: "pointer" }}>{disabled ? "啟用" : "停用"}</button>
+                          <button onClick={() => setConfirmDelete(u.uid)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.4)", background: "transparent", color: "#ef4444", fontSize: 11.5, cursor: "pointer" }}>刪除</button>
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ===== Main App =====
 function App() {
   const [page, setPage] = useState("home");
   const [activeDeck, setActiveDeck] = useState(null);
-  const [user, setUser] = useState(() => window.AuthAPI.current());
+  const [user, setUser] = useState(() => (window.AuthAPI ? window.AuthAPI.current() : null));
+  const [authReady, setAuthReady] = useState(() => (window.AuthAPI ? window.AuthAPI.current() !== null : false));
   const [menuOpen, setMenuOpen] = useState(false);
   const allDecks = useMemo(() => { const map = new Map(); for (const q of window.QUESTIONS) { const key = q.year + "::" + q.specialty; if (!map.has(key)) map.set(key, true); } return map.size; }, []);
   const handlePickDeck = (deck) => setActiveDeck(deck);
   const handleExitDeck = () => setActiveDeck(null);
-  const handleLogout = () => { window.AuthAPI.logout(); setUser(null); setMenuOpen(false); setActiveDeck(null); setPage("home"); };
+  const handleLogout = async () => { setMenuOpen(false); setActiveDeck(null); setPage("home"); try { await window.AuthAPI.logout(); } catch(e) {} };
   useEffect(() => { if (!menuOpen) return; const onClick = (e) => { if (!e.target.closest(".user-menu")) setMenuOpen(false); }; document.addEventListener("click", onClick); return () => document.removeEventListener("click", onClick); }, [menuOpen]);
-  if (!user) return <AuthScreen onLogin={setUser} />;
+  useEffect(() => { const unsub = window.AuthAPI.subscribe((profile) => { setUser(profile); setAuthReady(true); }); return () => { if (typeof unsub === "function") unsub(); }; }, []);
+  if (!authReady) return <Loading />;
+  if (!user) return <AuthScreen />;
+  if (user.needsProfile) return <ProfileCompletion user={user} />;
   let content;
   if (activeDeck) content = <Flashcard deck={activeDeck} onExit={handleExitDeck} />;
   else if (page === "home") content = <Home onNav={setPage} onPickDeck={handlePickDeck} />;
@@ -1372,16 +1628,17 @@ function App() {
   else if (page === "dashboard") content = <Dashboard />;
   else if (page === "syllabus") content = <Syllabus />;
   else if (page === "about") content = <About />;
+  else if (page === "admin" && user.isAdmin) content = <AdminPanel />;
   const initials = (user.name || "U").trim().slice(0, 2).toUpperCase();
-  const roleLabel = user.role === "certified" ? "已甄審 NP" : user.role === "other" ? "訪客 / 其他" : "訓練中 NP";
+  const roleLabel = user.isAdmin ? "管理員" : user.isGuest ? "訪客" : user.role === "certified" ? "已甄審 NP" : user.role === "other" ? "其他" : "訓練中 NP";
   return (
     <div className="app">
-      <Sidebar currentPage={page} onNav={(p) => { setActiveDeck(null); setPage(p); }} decks={allDecks} />
+      <Sidebar currentPage={page} onNav={(p) => { setActiveDeck(null); setPage(p); }} decks={allDecks} isAdmin={user.isAdmin} />
       <header className="topbar">
         <div className="topbar-left">
           <MedIcon name="pulse" size={16}/><span style={{ color: "var(--ink-3)" }}>NP Exam Prep Platform</span>
           <span style={{ width: 1, height: 14, background: "var(--border)" }}></span>
-          <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>{activeDeck ? "閃卡複習" : page === "home" ? "總覽" : page === "decks" ? "考古題卡組" : page === "review" ? "今日複習" : page === "dashboard" ? "甄審通過率儀表板" : page === "syllabus" ? "命題大綱" : "關於本站"}</span>
+          <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>{activeDeck ? "閃卡複習" : page === "home" ? "總覽" : page === "decks" ? "考古題卡組" : page === "review" ? "今日複習" : page === "dashboard" ? "甄審通過率儀表板" : page === "syllabus" ? "命題大綱" : page === "admin" ? "使用者管理" : "關於本站"}</span>
         </div>
         <div className="topbar-right">
           <div className="topbar-time"><MedIcon name="calendar" size={13}/><span>113 年度</span></div>
