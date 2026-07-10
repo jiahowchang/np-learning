@@ -624,7 +624,7 @@ window.SPECIALTIES = [
   { id: "family",    name: "家庭科", short: "家", className: "spec-pediatric" },
 ];
 window.QUESTION_TYPES = [
-  { id: "general",  name: "專科護理通論", desc: "六科共同基礎科目" },
+  { id: "general",  name: "專科護理通論", desc: "各專科共同基礎科目" },
   { id: "advanced", name: "進階專科護理", desc: "分科專業考試" },
 ];
 window.YEARS = [114, 113, 112, 111, 110, 109];
@@ -941,7 +941,7 @@ function AuthScreen() {
           </div>
           <div className="auth-tagline">為訓練中的<br/><span style={{ color: "var(--accent)" }}>專科護理師</span><br/>而生的考試準備平台</div>
           <ul className="auth-features">
-            <li><div className="auth-feat-icon"><MedIcon name="clipboard" size={16}/></div><div><div className="auth-feat-title">六科歷屆考古題</div><div className="auth-feat-sub">內、精神、兒、外、婦產、麻醉</div></div></li>
+            <li><div className="auth-feat-icon"><MedIcon name="clipboard" size={16}/></div><div><div className="auth-feat-title">八科歷屆考古題</div><div className="auth-feat-sub">通論、內、精神、兒、外、婦產、麻醉、家醫</div></div></li>
             <li><div className="auth-feat-icon"><MedIcon name="lightbulb" size={16}/></div><div><div className="auth-feat-title">閃卡複習 + 詳細題解</div><div className="auth-feat-sub">每題附重點整理與參考來源</div></div></li>
             <li><div className="auth-feat-icon"><MedIcon name="trend-up" size={16}/></div><div><div className="auth-feat-title">通過率儀表板</div><div className="auth-feat-sub">歷年甄審結果視覺化</div></div></li>
           </ul>
@@ -1080,11 +1080,12 @@ function Home({ onNav, onPickDeck }) {
   const stats = window.PASS_STATS;
   const latest = stats.yearly[stats.yearly.length - 1];
   const countBySpec = id => qs.filter(q => q.specialty === id).length;
+  const yearsBySpec = id => new Set(qs.filter(q => q.specialty === id).map(q => q.year)).size;
   return (
     <div className="fade-in">
       <div className="hero">
         <div className="hero-deco-icons"><MedIcon name="stethoscope" size={26}/><MedIcon name="pulse" size={26}/><MedIcon name="pill" size={26}/><MedIcon name="shield" size={26}/></div>
-        <div className="hero-eyebrow"><MedIcon name="cross" size={11}/><span style={{ marginLeft: 6 }}>NP EXAM PREP · 113 年度</span></div>
+        <div className="hero-eyebrow"><MedIcon name="cross" size={11}/><span style={{ marginLeft: 6 }}>NP EXAM PREP · {Math.max(...window.YEARS)} 年度</span></div>
         <h1 className="hero-title">用閃卡複習，把每題弄懂再上考場</h1>
         <p className="hero-desc">收錄歷屆專科護理師甄審筆試題目，依年度、科別、題型分類；每題附詳細題解、重點整理與參考來源。翻牌複習，間隔重溫，搭配通過率儀表板掌握學習進度與全國趨勢。</p>
         <div className="hero-cta-row">
@@ -1099,6 +1100,7 @@ function Home({ onNav, onPickDeck }) {
         <Kpi label={`${latest.year}年通過率`} value={latest.rate} unit="%" delta="+2.8%" deltaDir="up" icon="target" iconCls="blue" />
         <Kpi label={`${latest.year}年通過人數`} value={latest.passed.toLocaleString()} unit="人" icon="award" iconCls="warm" />
       </div>
+      <div style={{ margin: "2px 2px 14px", fontSize: 12, color: "var(--ink-3)", opacity: 0.85 }}>通過率與通過人數為示範資料，實際請以衛福部公告為準。</div>
       <div style={{ margin: "8px 0 12px", display: "flex", alignItems: "center", gap: 10 }}>
         <MedIcon name="stethoscope" size={16} />
         <h3 style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--ink-3)", margin: 0 }}>依科別瀏覽</h3>
@@ -1108,7 +1110,7 @@ function Home({ onNav, onPickDeck }) {
           <div key={s.id} className={"spec-summary " + s.className} onClick={() => onNav("decks")} style={{ cursor: "pointer" }}>
             <div className="spec-icon-tile"><SpecIcon id={s.id} size={22} /></div>
             <div className="spec-summary-name">{s.name}</div>
-            <div className="spec-summary-count">收錄 {countBySpec(s.id)} 題 · 跨 {window.YEARS.length} 年</div>
+            <div className="spec-summary-count">收錄 {countBySpec(s.id)} 題 · 跨 {yearsBySpec(s.id)} 年</div>
           </div>
         ))}
       </div>
@@ -1510,7 +1512,7 @@ function About() {
         <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-3)", margin: "0 0 8px" }}>網站目的</h3>
         <p style={{ marginTop: 0 }}>本平台為訓練中之台灣專科護理師（Nurse Practitioner, NP）整理歷屆甄審筆試考古題，依年度、科別、題型分頁，並以「閃卡」形式輔助記憶複習。每題附詳細題解、重點整理、關鍵字與參考來源。</p>
         <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-3)", margin: "20px 0 8px" }}>科別範圍</h3>
-        <p style={{ marginTop: 0 }}>內科、精神科、兒科、外科、婦產科、麻醉科 共六科。</p>
+        <p style={{ marginTop: 0 }}>通論、內科、精神科、兒科、外科、婦產科、麻醉科、家庭科 共八科。</p>
         <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-3)", margin: "20px 0 8px" }}>使用說明</h3>
         <ul style={{ marginTop: 0, paddingLeft: 18 }}>
           <li>於「考古題卡組」依年度／科別／題型篩選</li>
@@ -1641,7 +1643,7 @@ function App() {
           <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>{activeDeck ? "閃卡複習" : page === "home" ? "總覽" : page === "decks" ? "考古題卡組" : page === "review" ? "今日複習" : page === "dashboard" ? "甄審通過率儀表板" : page === "syllabus" ? "命題大綱" : page === "admin" ? "使用者管理" : "關於本站"}</span>
         </div>
         <div className="topbar-right">
-          <div className="topbar-time"><MedIcon name="calendar" size={13}/><span>113 年度</span></div>
+          <div className="topbar-time"><MedIcon name="calendar" size={13}/><span>{Math.max(...window.YEARS)} 年度</span></div>
           <div className="topbar-author">
             <div className="topbar-author-avatar"><MedIcon name="stethoscope" size={16}/></div>
             <div className="topbar-author-text">
