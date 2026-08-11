@@ -263,12 +263,12 @@ body::before {
   height: 100%; background: linear-gradient(90deg, var(--accent), oklch(0.65 0.18 220));
   border-radius: 99px; transition: width 0.4s cubic-bezier(.22,.61,.36,1); box-shadow: 0 0 12px var(--accent-glow);
 }
-.flash-card { perspective: 2000px; height: 520px; }
-.flash-card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.7s cubic-bezier(.22,.61,.36,1); transform-style: preserve-3d; }
+.flash-card { perspective: 2000px; }
+.flash-card-inner { position: relative; width: 100%; transition: transform 0.7s cubic-bezier(.22,.61,.36,1); transform-style: preserve-3d; display: grid; }
 .flash-card.flipped .flash-card-inner { transform: rotateY(180deg); }
 .flash-face.back { transform: rotateY(180deg); }
 .flash-face {
-  position: absolute; inset: 0; backface-visibility: hidden;
+  grid-area: 1 / 1; min-height: 520px; backface-visibility: hidden;
   background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
   border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 36px 40px;
   display: flex; flex-direction: column; box-shadow: var(--shadow-md); overflow: hidden;
