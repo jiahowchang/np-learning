@@ -840,6 +840,7 @@ function NavIcon({ name }) {
     case "review": return <svg viewBox="0 0 24 24" {...s}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>;
     case "chart": return <svg viewBox="0 0 24 24" {...s}><path d="M4 20V8"/><path d="M10 20V4"/><path d="M16 20v-9"/><path d="M22 20H2"/></svg>;
     case "target": return <svg viewBox="0 0 24 24" {...s}><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>;
+    case "flag": return <svg viewBox="0 0 24 24" {...s}><path d="M5 21V4"/><path d="M5 4c3-1.5 6 1.5 9 0s5 0 5 0v9c0 0-2 1.5-5 0s-6-1.5-9 0"/></svg>;
     case "book": return <svg viewBox="0 0 24 24" {...s}><path d="M4 4h12a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4V4Z"/><path d="M4 16a4 4 0 0 1 4-4h12"/></svg>;
     case "info": return <svg viewBox="0 0 24 24" {...s}><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="8" r=".5" fill="currentColor"/></svg>;
     case "shield": return <svg viewBox="0 0 24 24" {...s}><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/></svg>;
@@ -848,12 +849,13 @@ function NavIcon({ name }) {
 }
 
 // ===== Sidebar =====
-function Sidebar({ currentPage, onNav, decks, isAdmin }) {
+function Sidebar({ currentPage, onNav, decks, isAdmin, wrong }) {
   const totalCards = window.QUESTIONS.length;
   const items = [
     { id: "home", label: "總覽", icon: "home" },
     { id: "decks", label: "考古題卡組", icon: "deck", badge: decks },
     { id: "review", label: "今日複習", icon: "review" },
+    { id: "wrongbook", label: "錯題本", icon: "flag", badge: wrong > 0 ? wrong : null, badgeAlert: true },
     { id: "analytics", label: "弱點分析", icon: "target" },
     { id: "dashboard", label: "通過率儀表板", icon: "chart" },
   ];
@@ -877,7 +879,7 @@ function Sidebar({ currentPage, onNav, decks, isAdmin }) {
           <div key={it.id} className={"nav-item " + (currentPage === it.id ? "active" : "")} onClick={() => onNav(it.id)}>
             <span className="nav-icon"><NavIcon name={it.icon} /></span>
             <span>{it.label}</span>
-            {it.badge != null && <span className="nav-badge">{it.badge}</span>}
+            {it.badge != null && <span className="nav-badge" style={it.badgeAlert ? { background: "var(--rose)", color: "#fff" } : undefined}>{it.badge}</span>}
           </div>
         ))}
       </div>
@@ -1111,7 +1113,7 @@ function Kpi({ label, value, unit, delta, deltaDir, icon, iconCls }) {
 }
 
 // ===== Home =====
-function Home({ onNav, onPickDeck }) {
+function Home({ onNav, onPickDeck, wrongCount }) {
   const specs = window.SPECIALTIES;
   const qs = window.QUESTIONS;
   const stats = window.PASS_STATS;
@@ -1131,6 +1133,16 @@ function Home({ onNav, onPickDeck }) {
         </div>
         <div style={{ marginTop: 28, display: "flex", alignItems: "center", gap: 10, opacity: 0.55 }}><EkgLine width={420} height={36} color="var(--accent-deep)" /></div>
       </div>
+      {wrongCount > 0 && (
+        <button type="button" onClick={() => onNav("wrongbook")} style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 14, background: "color-mix(in oklch, var(--rose) 12%, var(--surface))", border: "1px solid color-mix(in oklch, var(--rose) 40%, transparent)", borderRadius: "var(--radius-lg)", padding: "16px 20px", margin: "0 0 20px", cursor: "pointer", color: "inherit", font: "inherit" }}>
+          <div style={{ fontSize: 28 }}>📌</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15.5, fontWeight: 700, color: "var(--ink)" }}>你有 {wrongCount} 題答錯待複習</div>
+            <div style={{ fontSize: 13, color: "var(--ink-3)", marginTop: 2 }}>錯題會自動收進「錯題本」，重練答對就移出。點此立即複習。</div>
+          </div>
+          <div style={{ color: "var(--rose)", fontWeight: 700, fontSize: 13.5, whiteSpace: "nowrap" }}>去複習 →</div>
+        </button>
+      )}
       <div className="kpi-row">
         <Kpi label="題庫總數" value={qs.length} unit="題" icon="clipboard" />
         <Kpi label="收錄年度" value={`109–${Math.max(...window.YEARS)}`} icon="calendar" />
@@ -1838,26 +1850,107 @@ function Analytics({ onPickDeck }) {
   );
 }
 
+// 錯題本：自動收集答錯的題目，重練答對就移出「待複習」
+function WrongBook({ onPickDeck }) {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("toReview"); // toReview | mastered | all
+  useEffect(() => { let alive = true; window.StatsAPI.load().then(s => { if (alive) { setStats(s || {}); setLoading(false); } }).catch(() => { if (alive) { setStats({}); setLoading(false); } }); return () => { alive = false; }; }, []);
+  const data = useMemo(() => {
+    if (!stats) return null;
+    const byId = {}; window.QUESTIONS.forEach(q => byId[q.id] = q);
+    const entries = Object.entries(stats).map(([qid, s]) => ({ qid, q: byId[qid], n: (s && s.n) || 0, w: (s && s.w) || 0, last: s && s.last, at: (s && s.at) || 0 })).filter(e => e.q && e.n > 0 && e.w > 0);
+    const toReview = entries.filter(e => e.last !== 1).sort((a, b) => b.w - a.w || b.at - a.at);
+    const mastered = entries.filter(e => e.last === 1).sort((a, b) => b.w - a.w);
+    const all = [...entries].sort((a, b) => b.w - a.w || b.at - a.at);
+    return { toReview, mastered, all };
+  }, [stats]);
+  if (loading) return <div className="fade-in"><div className="page-head"><div><h1 className="page-title">錯題本</h1><p className="page-sub">載入你的作答紀錄中…</p></div></div></div>;
+  const hasAny = data && data.all.length > 0;
+  const list = !data ? [] : filter === "toReview" ? data.toReview : filter === "mastered" ? data.mastered : data.all;
+  const chip = (id, label, n) => (
+    <button type="button" onClick={() => setFilter(id)} style={{ background: filter === id ? "var(--accent)" : "var(--surface-alt)", color: filter === id ? "#04121a" : "var(--ink-2)", border: "1px solid " + (filter === id ? "var(--accent)" : "var(--border)"), borderRadius: 99, padding: "7px 15px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{label} {n}</button>
+  );
+  return (
+    <div className="fade-in">
+      <div className="page-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
+        <div><h1 className="page-title">錯題本</h1><p className="page-sub">答錯的題目自動收進來，提醒你再練一次；重練答對就移到「已掌握」（登入後跨裝置同步）</p></div>
+        {data && data.toReview.length > 0 && <button className="btn-primary" onClick={() => onPickDeck({ year: "錯題", specialty: "review", qs: data.toReview.map(e => e.q) })}><MedIcon name="play" size={14}/><span style={{ marginLeft: 8 }}>重新練習全部（{data.toReview.length} 題）</span></button>}
+      </div>
+      {!hasAny ? (
+        <div className="card" style={{ padding: 44, textAlign: "center" }}>
+          <div style={{ fontSize: 42, marginBottom: 10 }}>🎉</div>
+          <div style={{ fontSize: 15, color: "var(--ink)", fontWeight: 600 }}>目前沒有任何答錯的題目</div>
+          <div style={{ fontSize: 13.5, marginTop: 8, color: "var(--ink-3)", lineHeight: 1.7 }}>到「考古題卡組」練習後，凡是<b>答錯</b>的題目都會自動收進錯題本，方便你反覆複習到熟為止。</div>
+        </div>
+      ) : (
+        <React.Fragment>
+          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+            {chip("toReview", "待複習", data.toReview.length)}
+            {chip("mastered", "已掌握", data.mastered.length)}
+            {chip("all", "全部曾錯", data.all.length)}
+          </div>
+          {list.length === 0 ? (
+            <div className="card" style={{ padding: 36, textAlign: "center" }}>
+              <div style={{ fontSize: 34, marginBottom: 8 }}>{filter === "toReview" ? "👍" : "—"}</div>
+              <div style={{ fontSize: 14.5, color: "var(--ink)", fontWeight: 600 }}>{filter === "toReview" ? "待複習清空了！" : "這個分類目前沒有題目"}</div>
+              {filter === "toReview" && <div style={{ fontSize: 13, marginTop: 6, color: "var(--ink-3)" }}>你把答錯的題目都重練答對了，可切到「已掌握」回顧。</div>}
+            </div>
+          ) : (
+            <div className="card" style={{ padding: 20 }}>
+              <div style={{ display: "grid", gap: 8 }}>
+                {list.map(e => { const sp = window.SPECIALTIES.find(s => s.id === e.q.specialty); const wrong = e.last !== 1; return (
+                  <button key={e.qid} type="button" onClick={() => onPickDeck({ year: "錯題", specialty: "review", qs: [e.q] })}
+                    style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center", textAlign: "left", background: "var(--surface-alt)", border: "1px solid var(--border)", borderLeft: "3px solid " + (wrong ? "var(--rose)" : "var(--green)"), borderRadius: 10, padding: "10px 14px", cursor: "pointer", color: "inherit", font: "inherit", width: "100%" }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 11.5, color: "var(--ink-3)", fontFamily: "var(--font-mono)", marginBottom: 2 }}>{e.qid} · {sp ? sp.name : ""}</div>
+                      <div style={{ fontSize: 13.5, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.q.stem.replace(/\n/g, " ").slice(0, 52)}…</div>
+                    </div>
+                    <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                      <div style={{ fontSize: 12.5, color: "var(--rose)", fontWeight: 700 }}>答錯 {e.w}/{e.n} 次</div>
+                      <div style={{ fontSize: 11, color: wrong ? "var(--ink-3)" : "var(--green)", marginTop: 2 }}>{wrong ? "上次答錯" : "上次答對 ✓"}</div>
+                    </div>
+                  </button>
+                ); })}
+              </div>
+            </div>
+          )}
+        </React.Fragment>
+      )}
+    </div>
+  );
+}
+
 function App() {
   const [page, setPage] = useState("home");
   const [activeDeck, setActiveDeck] = useState(null);
   const [user, setUser] = useState(() => (window.AuthAPI ? window.AuthAPI.current() : null));
   const [authReady, setAuthReady] = useState(() => (window.AuthAPI ? window.AuthAPI.current() !== null : false));
   const [menuOpen, setMenuOpen] = useState(false);
+  const [wrongCount, setWrongCount] = useState(0);
   const allDecks = useMemo(() => { const map = new Map(); for (const q of window.QUESTIONS) { const key = q.year + "::" + q.specialty; if (!map.has(key)) map.set(key, true); } return map.size; }, []);
+  const refreshWrong = () => {
+    if (!window.StatsAPI) return;
+    window.StatsAPI.load().then(s => {
+      const byId = {}; window.QUESTIONS.forEach(q => byId[q.id] = q);
+      let c = 0; for (const qid in s) { const e = s[qid]; if (e && byId[qid] && (e.n || 0) > 0 && (e.w || 0) > 0 && e.last !== 1) c++; }
+      setWrongCount(c);
+    }).catch(() => {});
+  };
   const handlePickDeck = (deck) => setActiveDeck(deck);
-  const handleExitDeck = () => setActiveDeck(null);
+  const handleExitDeck = () => { setActiveDeck(null); refreshWrong(); };
   const handleLogout = async () => { setMenuOpen(false); setActiveDeck(null); setPage("home"); try { await window.AuthAPI.logout(); } catch(e) {} };
   useEffect(() => { if (!menuOpen) return; const onClick = (e) => { if (!e.target.closest(".user-menu")) setMenuOpen(false); }; document.addEventListener("click", onClick); return () => document.removeEventListener("click", onClick); }, [menuOpen]);
-  useEffect(() => { const unsub = window.AuthAPI.subscribe((profile) => { setUser(profile); setAuthReady(true); }); const timer = setTimeout(() => setAuthReady(true), 1500); return () => { if (typeof unsub === "function") unsub(); clearTimeout(timer); }; }, []);
+  useEffect(() => { const unsub = window.AuthAPI.subscribe((profile) => { setUser(profile); setAuthReady(true); refreshWrong(); }); refreshWrong(); const timer = setTimeout(() => setAuthReady(true), 1500); return () => { if (typeof unsub === "function") unsub(); clearTimeout(timer); }; }, []);
   if (!authReady) return <Loading />;
   if (!user) return <AuthScreen />;
   if (user.needsProfile && !user.isAdmin) return <ProfileCompletion user={user} />;
   let content;
   if (activeDeck) content = <Flashcard deck={activeDeck} onExit={handleExitDeck} />;
-  else if (page === "home") content = <Home onNav={setPage} onPickDeck={handlePickDeck} />;
+  else if (page === "home") content = <Home onNav={setPage} onPickDeck={handlePickDeck} wrongCount={wrongCount} />;
   else if (page === "decks") content = <DeckList onPickDeck={handlePickDeck} />;
   else if (page === "review") content = <ReviewToday onPickDeck={handlePickDeck} />;
+  else if (page === "wrongbook") content = <WrongBook onPickDeck={handlePickDeck} />;
   else if (page === "analytics") content = <Analytics onPickDeck={handlePickDeck} />;
   else if (page === "dashboard") content = <Dashboard />;
   else if (page === "syllabus") content = <Syllabus />;
@@ -1867,12 +1960,12 @@ function App() {
   const roleLabel = user.isAdmin ? "管理員" : user.isGuest ? "訪客" : user.role === "certified" ? "已甄審 NP" : user.role === "other" ? "其他" : "訓練中 NP";
   return (
     <div className="app">
-      <Sidebar currentPage={page} onNav={(p) => { setActiveDeck(null); setPage(p); }} decks={allDecks} isAdmin={user.isAdmin} />
+      <Sidebar currentPage={page} onNav={(p) => { setActiveDeck(null); setPage(p); }} decks={allDecks} isAdmin={user.isAdmin} wrong={wrongCount} />
       <header className="topbar">
         <div className="topbar-left">
           <MedIcon name="pulse" size={16}/><span style={{ color: "var(--ink-3)" }}>NP Exam Prep Platform</span>
           <span style={{ width: 1, height: 14, background: "var(--border)" }}></span>
-          <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>{activeDeck ? "閃卡複習" : page === "home" ? "總覽" : page === "decks" ? "考古題卡組" : page === "review" ? "今日複習" : page === "analytics" ? "弱點分析" : page === "dashboard" ? "甄審通過率儀表板" : page === "syllabus" ? "命題大綱" : page === "admin" ? "使用者管理" : "關於本站"}</span>
+          <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>{activeDeck ? "閃卡複習" : page === "home" ? "總覽" : page === "decks" ? "考古題卡組" : page === "review" ? "今日複習" : page === "wrongbook" ? "錯題本" : page === "analytics" ? "弱點分析" : page === "dashboard" ? "甄審通過率儀表板" : page === "syllabus" ? "命題大綱" : page === "admin" ? "使用者管理" : "關於本站"}</span>
         </div>
         <div className="topbar-right">
           <div className="topbar-time"><MedIcon name="calendar" size={13}/><span>{Math.max(...window.YEARS)} 年度</span></div>
