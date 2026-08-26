@@ -1244,25 +1244,31 @@ function Flashcard({ deck, onExit }) {
   const [selected, setSelected] = useState(null);
   const [answers, setAnswers] = useState(() => ({}));   // { qid: { picked, correct } }
   const [showResult, setShowResult] = useState(false);
+  const [retry, setRetry] = useState(false);   // 按「再練一次」後回到原題重做的狀態
   const total = deck.qs.length;
   const q = deck.qs[idx];
   const spec = window.SPECIALTIES.find(s => s.id === q.specialty);
   const type = window.QUESTION_TYPES.find(t => t.id === q.type);
   const next = useCallback(() => {
     if (idx >= total - 1) { setShowResult(true); return; }   // 最後一題後 → 顯示成績
-    setFlipped(false); setSelected(null); setIdx(i => i + 1);
+    setFlipped(false); setSelected(null); setRetry(false); setIdx(i => i + 1);
   }, [idx, total]);
-  const prev = useCallback(() => { setFlipped(false); setSelected(null); setIdx(i => Math.max(0, i - 1)); }, []);
+  const prev = useCallback(() => { setFlipped(false); setSelected(null); setRetry(false); setIdx(i => Math.max(0, i - 1)); }, []);
   const pickAnswer = (key) => {
     if (selected) return;
     setSelected(key);
     const isRight = key === q.answer;
     setAnswers(a => a[q.id] ? a : ({ ...a, [q.id]: { picked: key, correct: isRight } }));
-    try { window.StatsAPI && window.StatsAPI.record(q.id, isRight); } catch(e) {}  // 累積個人化統計
+    // 重做（已看過解答）不計入統計，避免「看完答案再選一次」被誤判為已掌握而移出錯題本
+    if (!retry) { try { window.StatsAPI && window.StatsAPI.record(q.id, isRight); } catch(e) {} }
     setTimeout(() => setFlipped(true), 700);
   };
-  const restart = () => { setShowResult(false); setIdx(0); setSelected(null); setFlipped(false); setAnswers({}); };
+  const restart = () => { setShowResult(false); setIdx(0); setSelected(null); setFlipped(false); setRetry(false); setAnswers({}); };
   const rate = (level) => {
+    if (level === "again") {   // 完全不會 → 留在「原題目」重做一次，不前進、不計入已複習
+      setRetry(true); setSelected(null); setFlipped(false);
+      return;
+    }
     const k = "progress::" + deck.year + "::" + deck.specialty;
     const newSet = new Set(reviewed); newSet.add(q.id); setReviewed(newSet);
     localStorage.setItem(k, String(newSet.size));
@@ -1363,8 +1369,8 @@ function Flashcard({ deck, onExit }) {
             <div className="flash-meta">
               <div className="spec-icon-tile sm" style={{ marginRight: 4 }}><SpecIcon id={q.specialty} size={16}/></div>
               <span className="flash-tag" style={{ fontFamily: "var(--font-mono)" }}>{q.id}</span>
-              <span style={{ fontSize: 11, color: "var(--ink-3)", letterSpacing: "0.06em", marginLeft: "auto" }}>
-                {selected ? (selected === q.answer ? "✓ 答對了" : "✗ 答錯，正確為 (" + q.answer + ")") : "點選作答（A／B／C／D）"}
+              <span style={{ fontSize: 11, color: (retry && !selected) ? "var(--warm)" : "var(--ink-3)", fontWeight: (retry && !selected) ? 700 : 400, letterSpacing: "0.06em", marginLeft: "auto" }}>
+                {selected ? (selected === q.answer ? "✓ 答對了" : "✗ 答錯，正確為 (" + q.answer + ")") : retry ? "🔁 再練一次 · 同一題，重新作答" : "點選作答（A／B／C／D）"}
               </span>
             </div>
             <div className="flash-stem">
